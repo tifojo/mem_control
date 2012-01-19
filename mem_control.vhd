@@ -47,10 +47,8 @@ entity mem_control is
 				
 				-- read/write data are registered in the IO block
 				req_data_write : in STD_LOGIC_VECTOR (15 downto 0);
-				req_data_read : out STD_LOGIC_VECTOR (15 downto 0);
+				req_data_read : out STD_LOGIC_VECTOR (15 downto 0)
 				
-				-- test LEDs
-				Led : out STD_LOGIC_VECTOR (7 downto 0)
 				);
 				
 end mem_control;
@@ -61,6 +59,7 @@ architecture Behavioral of mem_control is
 
 	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, 1/2 drive, continuous burst)
 	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "00010000101110100011111";
+	constant LAT_CODE : integer := 3;
 	
 	signal addr_reg : STD_LOGIC_VECTOR (22 downto 0) := CONFIG_WORD;
 	signal addr_next : STD_LOGIC_VECTOR (22 downto 0);
@@ -72,20 +71,32 @@ architecture Behavioral of mem_control is
 	signal OE_next, WE_next, ADV_next, CE_next : STD_LOGIC;
 	signal CRE_reg : STD_LOGIC := '0';
 	signal CRE_next : STD_LOGIC;
+	signal ready_reg : STD_LOGIC := '0';
+	signal ready_next : STD_LOGIC;
 	
 	signal data_write_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- FPGA to PSRAM data register
 	signal data_write_next : STD_LOGIC_VECTOR (15 downto 0);
 	
 	signal data_read_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- PSRAM to FPGA data register
---	signal data_read_next : STD_LOGIC_VECTOR (15 downto 0);
 	signal data_read_en: STD_LOGIC;
 	
-	type state_type is (start, config_1, config_2, config_3, config_4, config_5, idle, test_1, test_done);
+	type state_type is (start, config_1, config_2, config_3, config_4, config_5, idle, read_start, read_lat, read_data, read_done);
 	signal state_reg : state_type := start;
 	signal state_next : state_type;
 	
-	signal lat_counter_reg : INTEGER range 0 to 3 := 0;
+	signal lat_counter_reg : INTEGER range 0 to LAT_CODE := 0;
 	signal lat_counter_rst, lat_counter_en: STD_LOGIC;
+	
+	signal data_counter_reg : UNSIGNED (7 downto 0) := (others => '0');
+	signal data_counter_rst, data_counter_en : STD_LOGIC;
+
+	-- Signals for DDR clock generator
+	signal clk_n : STD_LOGIC;
+	signal ddr_d0_reg : STD_LOGIC := '0';
+	signal ddr_d1_reg : STD_LOGIC := '0';
+	signal ddr_en_reg : STD_LOGIC := '0';
+	signal ddr_d0_next, ddr_d1_next, ddr_en_next : STD_LOGIC;
+	signal ddr_out : STD_LOGIC;
 
 
 begin
@@ -97,7 +108,6 @@ begin
 micronLB_n <= '0';
 micronUB_n <= '0';
 flashCS_n <= '1';
-micronClk <= '0';
 
 
 ------------------------------
@@ -136,8 +146,43 @@ begin
 		CRE_reg <= CRE_next;
 		addr_reg <= addr_next;
 		data_write_reg <= data_write_next;
+		ready_reg <= ready_next;
 	end if;
 end process;
+
+
+-------------------------------------
+-- Clock output using DDR registers
+-------------------------------------
+
+clk_n <= not clk;
+
+ODDR2_clockgen : ODDR2
+port map (
+			Q => ddr_out, -- clock output to PSRAM
+			C0 => clk, -- global 50 MHz clock
+			C1 => clk_n,
+			CE => ddr_en_reg,
+			D0 => ddr_d0_reg, -- 1-bit data input (associated with C0); D0='1' and D1='0' for normal clock output
+			D1 => ddr_d1_reg, -- 1-bit data input (associated with C1); D0='0' and D1='1' for inverted clock
+			R => '0', -- 1-bit reset input
+			S => '0' -- 1-bit set input
+			);
+
+-- registers for all DDR control signals (to prevent glitches and ease timing constraint)
+
+process(clk)
+begin
+	if rising_edge(clk) then
+		ddr_d0_reg <= ddr_d0_next;
+		ddr_d1_reg <= ddr_d1_next;
+		ddr_en_reg <= ddr_en_next;
+	end if;
+end process;
+
+
+micronClk <= ddr_out;
+
 
 
 
@@ -178,8 +223,20 @@ begin
 	end if;
 end process;
 
+process(clk, data_counter_rst, data_counter_en)
+begin
+	if rising_edge(clk) then
+		if data_counter_rst = '1' then
+			data_counter_reg <= (others => '0');
+		elsif data_counter_en = '1' then
+			data_counter_reg <= data_counter_reg + 1;
+		end if;
+	end if;
+end process;
+
+
 -- next state logic & unregistered outputs
-process(state_reg, addr_reg, data_write_reg, lat_counter_reg)
+process(state_reg, addr_reg, data_write_reg, lat_counter_reg, req_burst_128, req_read, req_addr, data_counter_reg)
 begin
 
 	-- defaults
@@ -189,7 +246,8 @@ begin
 	data_read_en <= '0';
 	lat_counter_rst <= '0';
 	lat_counter_en <= '0';
-	ready <= '0';
+	data_counter_rst <= '0';
+	data_counter_en <= '0';
 	
 	case state_reg is
 	
@@ -202,7 +260,7 @@ begin
 			state_next <= config_3;
 		when config_3 =>
 			lat_counter_en <= '1';
-			if lat_counter_reg = 2 then
+			if lat_counter_reg = LAT_CODE - 1 then
 				state_next <= config_4;
 			else
 				state_next <= config_3;
@@ -212,25 +270,42 @@ begin
 			state_next <= config_5;
 		when config_5 =>
 			lat_counter_en <= '1';
-			if lat_counter_reg = 3 then
+			if lat_counter_reg = LAT_CODE then
 				state_next <= idle;
 			else
 				state_next <= config_5;
 			end if;
-		when idle =>	
+		when idle =>
 			lat_counter_rst <= '1';
-			state_next <= test_1;
-		when test_1 =>
-			lat_counter_en <= '1';
-			if lat_counter_reg = 3 then
-				data_read_en <= '1';
-				state_next <= test_done;
+			data_counter_rst <= '1';			
+			if req_burst_128 = '1' and req_read = '1' then
+				state_next <= read_start;
+				addr_next <= req_addr; -- infers an enable for addr_reg
+--			elsif req_burst_128 = '1' and req_read = '0' then
+--				state_next <= write_start;
 			else
-				state_next <= test_1;
+				state_next <= idle;
 			end if;
-		
-		when test_done =>
-			ready <= '1';
+		when read_lat =>
+			lat_counter_en <= '1';
+			if lat_counter_reg = LAT_CODE then
+				data_counter_en <= '1';
+				state_next <= read_data;
+			else
+				state_next <= read_lat;
+			end if;
+		when read_data =>
+			data_read_en <= '1';
+			data_counter_en <= '1';
+			if data_counter_reg(7) = '1' then
+				state_next <= read_done;
+			else
+				state_next <= read_data;
+			end if;
+		when read_done =>
+			data_read_en <= '0';
+			state_next <= idle;
+
 		
 		when others =>
 			null;
@@ -250,6 +325,10 @@ begin
 	CE_next <= '1';
 	CRE_next <= '0';
 	tri_next <= '1';
+	ready_next <= '0';
+	ddr_d0_next <= '0';
+	ddr_d1_next <= '0';
+	ddr_en_next <= '0';
 	
 	case state_next is
 		
@@ -274,12 +353,30 @@ begin
 			CE_next <= '0';
 			OE_next <= '0';
 		when idle =>
-			null;
-		when test_1 =>
-			CRE_next <= '1';
+			ready_next <= '1';
+		when read_lat =>
+			ddr_d0_next <= '1';
+			ddr_d1_next <= '0';
+			ddr_en_next <= '1';
 			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
+		when read_data =>
+			ddr_d0_next <= '1';
+			ddr_d1_next <= '0';
+			ddr_en_next <= '1';
+			ADV_next <= '0';
+			CE_next <= '0';
+			OE_next <= '0';
+		when read_done =>
+			ddr_d0_next <= '0';
+			ddr_d1_next <= '0';
+			ddr_en_next <= '1';
+			ADV_next <= '0';
+			CE_next <= '0';
+			OE_next <= '0';
+
+
 		when others =>
 			null;
 	end case;
@@ -299,7 +396,6 @@ micronCRE <= CRE_reg;
 
 req_data_read <= data_read_reg;
 
-Led <= data_read_reg(15 downto 8);
 
 end Behavioral;
 

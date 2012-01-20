@@ -73,6 +73,8 @@ architecture Behavioral of mem_control is
 	signal CRE_next : STD_LOGIC;
 	signal ready_reg : STD_LOGIC := '0';
 	signal ready_next : STD_LOGIC;
+	signal increment_en_reg : STD_LOGIC := '0';
+	signal increment_en_next : STD_LOGIC;
 	
 	signal data_write_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- FPGA to PSRAM data register
 	signal data_write_next : STD_LOGIC_VECTOR (15 downto 0);
@@ -80,7 +82,7 @@ architecture Behavioral of mem_control is
 	signal data_read_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- PSRAM to FPGA data register
 	signal data_read_en: STD_LOGIC;
 	
-	type state_type is (start, config_1, config_2, config_3, config_4, config_5, idle, read_start, read_lat, read_data, read_done);
+	type state_type is (start, config_1, config_2, config_3, config_4, config_5, idle, read_lat, read_data, read_done);
 	signal state_reg : state_type := start;
 	signal state_next : state_type;
 	
@@ -147,6 +149,7 @@ begin
 		addr_reg <= addr_next;
 		data_write_reg <= data_write_next;
 		ready_reg <= ready_next;
+		increment_en_reg <= increment_en_next;
 	end if;
 end process;
 
@@ -242,7 +245,7 @@ begin
 	-- defaults
 	state_next <= state_reg;
 	addr_next <= addr_reg;
-	data_write_next <= data_write_reg;
+--	data_write_next <= data_write_reg;
 	data_read_en <= '0';
 	lat_counter_rst <= '0';
 	lat_counter_en <= '0';
@@ -279,7 +282,7 @@ begin
 			lat_counter_rst <= '1';
 			data_counter_rst <= '1';			
 			if req_burst_128 = '1' and req_read = '1' then
-				state_next <= read_start;
+				state_next <= read_lat;
 				addr_next <= req_addr; -- infers an enable for addr_reg
 --			elsif req_burst_128 = '1' and req_read = '0' then
 --				state_next <= write_start;
@@ -326,6 +329,7 @@ begin
 	CRE_next <= '0';
 	tri_next <= '1';
 	ready_next <= '0';
+	increment_en_next <= '0';
 	ddr_d0_next <= '0';
 	ddr_d1_next <= '0';
 	ddr_en_next <= '0';
@@ -368,13 +372,14 @@ begin
 			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
+			increment_en_next <= '1';
 		when read_done =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
 			ADV_next <= '0';
 			CE_next <= '0';
-			OE_next <= '0';
+			OE_next <= '1';
 
 
 		when others =>
@@ -394,7 +399,12 @@ micronADV_n <= ADV_reg;
 micronCE_n <= CE_reg;
 micronCRE <= CRE_reg;
 
+ready <= ready_reg;
 req_data_read <= data_read_reg;
+increment_en <= increment_en_reg;
+
+-- test
+data_write_next <= req_data_write;
 
 
 end Behavioral;

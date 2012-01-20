@@ -1,30 +1,3 @@
---------------------------------------------------------------------------------
--- Company: 
--- Engineer:
---
--- Create Date:   01:01:37 01/17/2012
--- Design Name:   
--- Module Name:   C:/Documents and Settings/timothyj/My Documents/Xilinx/Memory Controller/mem_control/simulation_testbench.vhd
--- Project Name:  mem_control
--- Target Device:  
--- Tool versions:  
--- Description:   
--- 
--- VHDL Test Bench Created by ISE for module: mem_control
--- 
--- Dependencies:
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
---
--- Notes: 
--- This testbench has been automatically generated using types std_logic and
--- std_logic_vector for the ports of the unit under test.  Xilinx recommends
--- that these types always be used for the top-level I/O of a design in order
--- to guarantee that the testbench will bind correctly to the post-implementation 
--- simulation model.
---------------------------------------------------------------------------------
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
  
@@ -39,7 +12,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
  
     -- Component Declaration for the Unit Under Test (UUT)
  
-    COMPONENT mem_control
+    COMPONENT hardware_testbench
     PORT(
          clk : IN  std_logic;
          micronAddr : OUT  std_logic_vector(22 downto 0);
@@ -53,12 +26,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
          micronCRE : OUT  std_logic;
          micronClk : OUT  std_logic;
          flashCS_n : OUT  std_logic;
-         ready : OUT  std_logic;
-         req_burst_128 : IN  std_logic;
-         req_read : IN  std_logic;
          increment_en : OUT  std_logic;
-         req_addr : IN  std_logic_vector(22 downto 0);
-         req_data_write : IN  std_logic_vector(15 downto 0);
          req_data_read : OUT  std_logic_vector(15 downto 0)
         );
     END COMPONENT;
@@ -66,10 +34,6 @@ ARCHITECTURE behavior OF simulation_testbench IS
 
    --Inputs
    signal clk : std_logic := '0';
-   signal req_burst_128 : std_logic := '0';
-   signal req_read : std_logic := '0';
-   signal req_addr : std_logic_vector(22 downto 0) := (others => '0');
-   signal req_data_write : std_logic_vector(15 downto 0) := (others => '0');
 
 	--BiDirs
    signal micronData : std_logic_vector(15 downto 0);
@@ -85,17 +49,17 @@ ARCHITECTURE behavior OF simulation_testbench IS
    signal micronCRE : std_logic;
    signal micronClk : std_logic;
    signal flashCS_n : std_logic;
-   signal ready : std_logic;
    signal increment_en : std_logic;
    signal req_data_read : std_logic_vector(15 downto 0);
 
    -- Clock period definitions
    constant clk_period : time := 20 ns;
+
  
 BEGIN
  
 	-- Instantiate the Unit Under Test (UUT)
-   uut: mem_control PORT MAP (
+   uut: hardware_testbench PORT MAP (
           clk => clk,
           micronAddr => micronAddr,
           micronData => micronData,
@@ -108,12 +72,7 @@ BEGIN
           micronCRE => micronCRE,
           micronClk => micronClk,
           flashCS_n => flashCS_n,
-          ready => ready,
-          req_burst_128 => req_burst_128,
-          req_read => req_read,
           increment_en => increment_en,
-          req_addr => req_addr,
-          req_data_write => req_data_write,
           req_data_read => req_data_read
         );
 
@@ -126,6 +85,7 @@ BEGIN
 		wait for clk_period/2;
    end process;
  
+
  
 
    -- Stimulus process

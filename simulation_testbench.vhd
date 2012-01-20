@@ -1,3 +1,4 @@
+
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
  
@@ -26,8 +27,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
          micronCRE : OUT  std_logic;
          micronClk : OUT  std_logic;
          flashCS_n : OUT  std_logic;
-         increment_en : OUT  std_logic;
-         req_data_read : OUT  std_logic_vector(15 downto 0)
+         read_out : OUT  std_logic_vector(15 downto 0)
         );
     END COMPONENT;
     
@@ -49,8 +49,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
    signal micronCRE : std_logic;
    signal micronClk : std_logic;
    signal flashCS_n : std_logic;
-   signal increment_en : std_logic;
-   signal req_data_read : std_logic_vector(15 downto 0);
+   signal read_out : std_logic_vector(15 downto 0);
 
    -- Clock period definitions
    constant clk_period : time := 20 ns;
@@ -72,8 +71,7 @@ BEGIN
           micronCRE => micronCRE,
           micronClk => micronClk,
           flashCS_n => flashCS_n,
-          increment_en => increment_en,
-          req_data_read => req_data_read
+          read_out => read_out
         );
 
    -- Clock process definitions

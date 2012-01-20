@@ -82,7 +82,8 @@ architecture Behavioral of mem_control is
 	signal data_read_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- PSRAM to FPGA data register
 	signal data_read_en: STD_LOGIC;
 	
-	type state_type is (start, config_1, config_2, config_3, config_4, config_5, idle, read_lat, read_data, read_done);
+	type state_type is (start, config_1, config_2, config_3, config_4, config_5, 
+								idle, read_lat, read_data, write_lat, write_data, done);
 	signal state_reg : state_type := start;
 	signal state_next : state_type;
 	
@@ -239,13 +240,13 @@ end process;
 
 
 -- next state logic & unregistered outputs
-process(state_reg, addr_reg, data_write_reg, lat_counter_reg, req_burst_128, req_read, req_addr, data_counter_reg)
+process(state_reg, addr_reg, data_write_reg, lat_counter_reg, req_burst_128, req_read, req_addr, data_counter_reg, req_data_write)
 begin
 
 	-- defaults
 	state_next <= state_reg;
 	addr_next <= addr_reg;
---	data_write_next <= data_write_reg;
+	data_write_next <= data_write_reg;
 	data_read_en <= '0';
 	lat_counter_rst <= '0';
 	lat_counter_en <= '0';
@@ -284,11 +285,13 @@ begin
 			if req_burst_128 = '1' and req_read = '1' then
 				state_next <= read_lat;
 				addr_next <= req_addr; -- infers an enable for addr_reg
---			elsif req_burst_128 = '1' and req_read = '0' then
---				state_next <= write_start;
+			elsif req_burst_128 = '1' and req_read = '0' then
+				state_next <= write_lat;
+				addr_next <= req_addr;
 			else
 				state_next <= idle;
 			end if;
+
 		when read_lat =>
 			lat_counter_en <= '1';
 			if lat_counter_reg = LAT_CODE then
@@ -301,15 +304,31 @@ begin
 			data_read_en <= '1';
 			data_counter_en <= '1';
 			if data_counter_reg(7) = '1' then
-				state_next <= read_done;
+				state_next <= done;
 			else
 				state_next <= read_data;
 			end if;
-		when read_done =>
-			data_read_en <= '0';
+		when done =>
 			state_next <= idle;
 
-		
+		when write_lat =>
+			lat_counter_en <= '1';
+			if lat_counter_reg = LAT_CODE then
+				data_counter_en <= '1';
+				data_write_next <= req_data_write;
+				state_next <= write_data;
+			else
+				state_next <= write_lat;
+			end if;
+		when write_data =>
+			data_counter_en <= '1';
+			data_write_next <= req_data_write;
+			if data_counter_reg(7) = '1' then
+				state_next <= done;
+			else
+				state_next <= write_data;
+			end if;
+
 		when others =>
 			null;
 				
@@ -318,7 +337,7 @@ begin
 end process;
 
 -- look-ahead logic for registered outputs
-process(state_next)
+process(state_next, lat_counter_reg, data_counter_reg)
 begin
 
 	-- defaults
@@ -358,6 +377,7 @@ begin
 			OE_next <= '0';
 		when idle =>
 			ready_next <= '1';
+
 		when read_lat =>
 			ddr_d0_next <= '1';
 			ddr_d1_next <= '0';
@@ -373,13 +393,38 @@ begin
 			CE_next <= '0';
 			OE_next <= '0';
 			increment_en_next <= '1';
-		when read_done =>
+		when done =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
 			ADV_next <= '0';
 			CE_next <= '0';
-			OE_next <= '1';
+		
+		when write_lat =>
+			ddr_d0_next <= '0';
+			ddr_d1_next <= '1';
+			ddr_en_next <= '1';
+			ADV_next <= '0';
+			CE_next <= '0';
+			tri_next <= '0';
+			if lat_counter_reg = LAT_CODE - 1 then
+				increment_en_next <= '1';
+			else
+				increment_en_next <= '0';
+			end if;
+		when write_data =>
+			ddr_d0_next <= '0';
+			ddr_d1_next <= '1';
+			ddr_en_next <= '1';
+			ADV_next <= '0';
+			CE_next <= '0';
+			tri_next <= '0';
+			if data_counter_reg = "01111111" then
+				increment_en_next <= '0';
+			else
+				increment_en_next <= '1';
+			end if;
+		
 
 
 		when others =>
@@ -402,9 +447,6 @@ micronCRE <= CRE_reg;
 ready <= ready_reg;
 req_data_read <= data_read_reg;
 increment_en <= increment_en_reg;
-
--- test
-data_write_next <= req_data_write;
 
 
 end Behavioral;

@@ -406,6 +406,7 @@ begin
 			ddr_en_next <= '1';
 			ADV_next <= '0';
 			CE_next <= '0';
+			WE_next <= '0';
 			tri_next <= '0';
 			if lat_counter_reg = LAT_CODE - 1 then
 				increment_en_next <= '1';
@@ -418,6 +419,7 @@ begin
 			ddr_en_next <= '1';
 			ADV_next <= '0';
 			CE_next <= '0';
+			WE_next <= '0';
 			tri_next <= '0';
 			if data_counter_reg = "01111111" then
 				increment_en_next <= '0';

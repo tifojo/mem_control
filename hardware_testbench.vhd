@@ -24,7 +24,9 @@ entity hardware_testbench is
 		
 		flashCS_n : out STD_LOGIC;
 		
-		read_out : out STD_LOGIC_VECTOR (15 downto 0)
+--		read_out : out STD_LOGIC_VECTOR (15 downto 0)
+
+		led_0 : out STD_LOGIC
 	 
 	 
 	 );
@@ -108,7 +110,8 @@ begin
 				if test_increment_en = '1' then
 					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 				elsif test_data_write = x"0080" then
-					test_state <= test_done;
+					test_state <= idle;
+					test_is_read <= '0';
 				else
 					null;
 				end if;
@@ -119,7 +122,10 @@ begin
 end process;
 		
 
-read_out <= test_data_read;
+led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
+			'0';
+
+-- read_out <= test_data_read;
 
 
 --process(clk, ready)

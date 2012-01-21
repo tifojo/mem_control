@@ -27,7 +27,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
          micronCRE : OUT  std_logic;
          micronClk : OUT  std_logic;
          flashCS_n : OUT  std_logic;
-         read_out : OUT  std_logic_vector(15 downto 0)
+         led_0 : OUT  std_logic
         );
     END COMPONENT;
     
@@ -49,7 +49,7 @@ ARCHITECTURE behavior OF simulation_testbench IS
    signal micronCRE : std_logic;
    signal micronClk : std_logic;
    signal flashCS_n : std_logic;
-   signal read_out : std_logic_vector(15 downto 0);
+   signal led_0 : std_logic;
 
    -- Clock period definitions
    constant clk_period : time := 20 ns;
@@ -71,7 +71,7 @@ BEGIN
           micronCRE => micronCRE,
           micronClk => micronClk,
           flashCS_n => flashCS_n,
-          read_out => read_out
+          led_0 => led_0
         );
 
    -- Clock process definitions

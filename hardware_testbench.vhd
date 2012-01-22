@@ -26,7 +26,10 @@ entity hardware_testbench is
 		
 --		read_out : out STD_LOGIC_VECTOR (15 downto 0)
 
-		led_0 : out STD_LOGIC
+		led_0 : out STD_LOGIC;
+		led_1 : out STD_LOGIC;
+		
+		micron_wait : in STD_LOGIC
 	 
 	 
 	 );
@@ -48,12 +51,25 @@ architecture Behavioral of hardware_testbench is
 	
 	type test_state_type is (idle, read_test, write_test, test_done);
 	signal test_state : test_state_type := idle;
+	
+	signal clk_25 : STD_LOGIC;
+	signal clk_50 : STD_LOGIC;
 
 begin
 
+clock_divider : entity work.clock_divider
+	port map(
+		CLKIN_IN => clk,
+		CLKDV_OUT => clk_25,
+		CLKIN_IBUFG_OUT => open,
+		CLK0_OUT => clk_50,
+		LOCKED_OUT => open);
+		
+
+
 mem_control_inst : entity work.mem_control
 	port map(
-		clk => clk,
+		clk => clk_50,
 		
 		micronAddr => micronAddr,
 		micronData => micronData,
@@ -78,10 +94,10 @@ mem_control_inst : entity work.mem_control
 	);
 
 
-process(clk)
+process(clk_50)
 begin
 	
-	if rising_edge(clk) then
+	if rising_edge(clk_50) then
 		case test_state is
 			when idle =>
 				test_data_write <= (others => '0');
@@ -91,7 +107,6 @@ begin
 				elsif test_is_read = '0' and test_ready ='1' then
 					test_state <= write_test;
 					test_req_burst <= '1';
-					test_address <= std_logic_vector(unsigned(test_address) + 1);
 				else
 					test_state <= idle;
 				end if;
@@ -99,7 +114,8 @@ begin
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
 					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-				elsif test_data_write = x"0080" then
+				end if;
+				if test_data_write = x"007f" then
 					test_state <= idle;
 					test_is_read <= '1';
 				else
@@ -109,9 +125,11 @@ begin
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
 					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-				elsif test_data_write = x"0080" then
+				end if;
+				if test_data_write = x"007f" then
 					test_state <= idle;
 					test_is_read <= '0';
+					test_address <= std_logic_vector(unsigned(test_address) + 128);
 				else
 					null;
 				end if;
@@ -124,6 +142,8 @@ end process;
 
 led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
 			'0';
+			
+led_1 <= micron_wait;
 
 -- read_out <= test_data_read;
 

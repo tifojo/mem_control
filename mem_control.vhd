@@ -67,8 +67,9 @@ architecture Behavioral of mem_control is
 	signal tri_reg : STD_LOGIC := '1'; -- tristate control register for data bus
 	signal tri_next : STD_LOGIC;
 	
-	signal OE_reg, WE_reg, ADV_reg, CE_reg : STD_LOGIC := '1'; -- all external signals registered
-	signal OE_next, WE_next, ADV_next, CE_next : STD_LOGIC;
+	signal OE_reg, WE_reg, CE_reg : STD_LOGIC := '1'; -- all external signals registered
+	signal OE_next, WE_next, CE_next : STD_LOGIC;
+	signal adv_d0, adv_d1 : STD_LOGIC;
 	signal CRE_reg : STD_LOGIC := '0';
 	signal CRE_next : STD_LOGIC;
 	signal ready_reg : STD_LOGIC := '0';
@@ -144,7 +145,7 @@ begin
 	if rising_edge(clk) then
 		OE_reg <= OE_next;
 		WE_reg <= WE_next;
-		ADV_reg <= ADV_next;
+--		ADV_reg <= ADV_next;
 		CE_reg <= CE_next;
 		CRE_reg <= CRE_next;
 		addr_reg <= addr_next;
@@ -153,6 +154,18 @@ begin
 		increment_en_reg <= increment_en_next;
 	end if;
 end process;
+
+ADV_output : ODDR2
+port map (
+			Q => micronADV_n,
+			C0 => clk,
+			C1 => clk_n,
+			CE => '1',
+			D0 => adv_d0,
+			D1 => adv_d1,
+			R => '0',
+			S => '0'
+			);
 
 
 -------------------------------------
@@ -252,6 +265,8 @@ begin
 	lat_counter_en <= '0';
 	data_counter_rst <= '0';
 	data_counter_en <= '0';
+	adv_d0 <= '1';
+	adv_d1 <= '1';
 	
 	case state_reg is
 	
@@ -259,6 +274,8 @@ begin
 			state_next <= config_1;
 		when config_1 =>
 			state_next <= config_2;
+			adv_d0 <= '0';
+			adv_d1 <= '0';
 		when config_2 =>
 			lat_counter_rst <= '1';
 			state_next <= config_3;
@@ -274,6 +291,8 @@ begin
 			state_next <= config_5;
 		when config_5 =>
 			lat_counter_en <= '1';
+			adv_d0 <= '0';
+			adv_d1 <= '0';
 			if lat_counter_reg = LAT_CODE then
 				state_next <= idle;
 			else
@@ -288,13 +307,17 @@ begin
 			elsif req_burst_128 = '1' and req_read = '0' then
 				state_next <= write_lat;
 				addr_next <= req_addr;
+				adv_d0 <= '0';
 			else
 				state_next <= idle;
 			end if;
 
 		when read_lat =>
 			lat_counter_en <= '1';
-			if lat_counter_reg = LAT_CODE then
+			if lat_counter_reg = 0 then		-- must use DDR register to generate ADV strobe
+				adv_d0 <= '0';
+				adv_d1 <= '0';
+			elsif lat_counter_reg = LAT_CODE then
 				data_counter_en <= '1';
 				state_next <= read_data;
 			else
@@ -313,7 +336,10 @@ begin
 
 		when write_lat =>
 			lat_counter_en <= '1';
-			if lat_counter_reg = LAT_CODE then
+			if lat_counter_reg = 0 then
+				adv_d0 <= '1';
+				adv_d1 <= '0';
+			elsif lat_counter_reg = LAT_CODE then
 				data_counter_en <= '1';
 				data_write_next <= req_data_write;
 				state_next <= write_data;
@@ -343,7 +369,7 @@ begin
 	-- defaults
 	OE_next <= '1';
 	WE_next <= '1';
-	ADV_next <= '1';
+--	ADV_next <= '1';
 	CE_next <= '1';
 	CRE_next <= '0';
 	tri_next <= '1';
@@ -357,11 +383,11 @@ begin
 		
 		when config_1 =>
 			CRE_next <= '1';
-			ADV_next <= '0';
+--			ADV_next <= '0';
 			CE_next <= '0';
 		when config_2 =>
 			CRE_next <= '1';
-			ADV_next <= '1';
+--			ADV_next <= '1';
 			CE_next <= '0';
 		when config_3 =>
 			CRE_next <= '1';
@@ -372,7 +398,7 @@ begin
 			CE_next <= '1';
 			WE_next <= '1';
 		when config_5 =>
-			ADV_next <= '0';
+--			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
 		when idle =>
@@ -382,14 +408,13 @@ begin
 			ddr_d0_next <= '1';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
-			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
 		when read_data =>
 			ddr_d0_next <= '1';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
-			ADV_next <= '0';
+--			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
 			increment_en_next <= '1';
@@ -397,27 +422,21 @@ begin
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
-			ADV_next <= '0';
+--			ADV_next <= '0';
 			CE_next <= '0';
 		
 		when write_lat =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '1';
 			ddr_en_next <= '1';
-			ADV_next <= '0';
 			CE_next <= '0';
 			WE_next <= '0';
 			tri_next <= '0';
-			if lat_counter_reg = LAT_CODE - 1 then
-				increment_en_next <= '1';
-			else
-				increment_en_next <= '0';
-			end if;
 		when write_data =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '1';
 			ddr_en_next <= '1';
-			ADV_next <= '0';
+--			ADV_next <= '0';
 			CE_next <= '0';
 			WE_next <= '0';
 			tri_next <= '0';
@@ -442,7 +461,7 @@ end process;
 micronAddr <= addr_reg;
 micronOE_n <= OE_reg;
 micronWE_n <= WE_reg;
-micronADV_n <= ADV_reg;
+--micronADV_n <= ADV_reg;
 micronCE_n <= CE_reg;
 micronCRE <= CRE_reg;
 

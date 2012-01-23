@@ -106,6 +106,7 @@ begin
 		case test_state is
 			when idle =>
 				test_data_write <= (others => '0');
+				test_address <= (others => '0');
 				if test_is_read = '1' and test_ready = '1' then
 					test_state <= read_test;
 					test_req_burst <= '1';
@@ -118,25 +119,38 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
-					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+					if test_data_write = x"FFFE" then
+						test_data_write <= (others => '0');
+					else
+						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+					end if;
 				end if;
 				if done = '1' then
-					test_state <= idle;
-					test_is_read <= '1';
-				else
-					null;
+					if test_address(22 downto 8) = "111111111111111" then
+						test_state <= idle;
+						test_is_read <= '1';
+					else
+						test_req_burst <= '1';
+						test_address <= std_logic_vector(unsigned(test_address) + 128);
+					end if;
 				end if;
 			when read_test =>
 				test_req_burst <= '0';
-				if test_increment_en = '1' then
-					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+				if test_read_valid = '1' then
+					if test_data_write = x"FFFE" then
+						test_data_write <= (others => '0');
+					else
+						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+					end if;
 				end if;
 				if done = '1' then
-					test_state <= idle;
-					test_is_read <= '0';
-					test_address <= std_logic_vector(unsigned(test_address) + 128);
-				else
-					null;
+					if test_address(22 downto 8) = "111111111111111" then
+						test_state <= idle;
+						test_is_read <= '0';
+					else
+						test_req_burst <= '1';
+						test_address <= std_logic_vector(unsigned(test_address) + 128);
+					end if;
 				end if;
 			when others =>
 				null;

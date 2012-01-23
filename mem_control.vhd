@@ -81,6 +81,7 @@ architecture Behavioral of mem_control is
 	signal ready_next : STD_LOGIC;
 	signal increment_en_reg : STD_LOGIC := '0';
 	signal increment_en_next : STD_LOGIC;
+	signal read_data_valid_next : STD_LOGIC;
 	
 	signal data_write_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0'); -- FPGA to PSRAM data register
 	signal data_write_next : STD_LOGIC_VECTOR (15 downto 0);
@@ -150,14 +151,13 @@ begin
 	if rising_edge(clk) then
 		OE_reg <= OE_next;
 		WE_reg <= WE_next;
---		ADV_reg <= ADV_next;
 		CE_reg <= CE_next;
 		CRE_reg <= CRE_next;
 		addr_reg <= addr_next;
 		data_write_reg <= data_write_next;
 		ready_reg <= ready_next;
 		increment_en_reg <= increment_en_next;
-		read_data_valid <= micronWait;
+		read_data_valid <= read_data_valid_next;
 	end if;
 end process;
 
@@ -257,7 +257,7 @@ end process;
 
 
 -- next state logic & unregistered outputs
-process(state_reg, addr_reg, data_write_reg, lat_counter_reg, req_burst_128, req_read, req_addr, data_counter_reg, req_data_write)
+process(state_reg, addr_reg, data_write_reg, lat_counter_reg, req_burst_128, req_read, req_addr, data_counter_reg, req_data_write, micronWait)
 begin
 
 	-- defaults
@@ -272,6 +272,7 @@ begin
 	adv_d0 <= '1';
 	adv_d1 <= '1';
 	req_done <= '0';
+	read_data_valid_next <= '0';
 	
 	case state_reg is
 	
@@ -331,6 +332,7 @@ begin
 		when read_data =>
 			data_read_en <= '1';
 			data_counter_en <= '1';
+			read_data_valid_next <= micronWait;
 			if data_counter_reg(7) = '1' then
 				state_next <= done;
 			else

@@ -21,6 +21,7 @@ entity mem_control is
 				micronUB_n : out  STD_LOGIC;
 				micronCRE : out  STD_LOGIC;
 				micronClk : out  STD_LOGIC;
+				micronWait : in STD_LOGIC;
 				
 				-- flash memory chip select (should stay deasserted)
 				flashCS_n : out  STD_LOGIC;
@@ -36,10 +37,12 @@ entity mem_control is
 				req_burst_128 : in STD_LOGIC; -- initiate 128-word access
 				
 				req_read : in STD_LOGIC; -- '1' to request read from mem
-												 
-				-- host should latch data or supply new write data
-				-- on rising edge of clk whenever "increment_en" is high
-				increment_en : out STD_LOGIC;
+				
+				-- host should latch read data on rising edge of clk when data_valid is high
+				read_data_valid : out STD_LOGIC;
+				
+				-- host should supply new write data on rising edge of clk when increment_en is high
+				write_increment_en : out STD_LOGIC;
 				
 				-- requested address must be divisible by 128
 				-- will be latched by RAM at start of read/write and auto-incremented
@@ -47,7 +50,9 @@ entity mem_control is
 				
 				-- read/write data are registered in the IO block
 				req_data_write : in STD_LOGIC_VECTOR (15 downto 0);
-				req_data_read : out STD_LOGIC_VECTOR (15 downto 0)
+				req_data_read : out STD_LOGIC_VECTOR (15 downto 0);
+				
+				req_done : out STD_LOGIC
 				
 				);
 				
@@ -58,7 +63,7 @@ architecture Behavioral of mem_control is
 	signal my_reset, my_reset_sync : STD_LOGIC := '1';  -- local reset for state machine
 
 	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, 1/2 drive, continuous burst)
-	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "00010000101110100011111";
+	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001011000"&"00"&"011"&"111";
 	constant LAT_CODE : integer := 3;
 	
 	signal addr_reg : STD_LOGIC_VECTOR (22 downto 0) := CONFIG_WORD;
@@ -152,6 +157,7 @@ begin
 		data_write_reg <= data_write_next;
 		ready_reg <= ready_next;
 		increment_en_reg <= increment_en_next;
+		read_data_valid <= micronWait;
 	end if;
 end process;
 
@@ -199,8 +205,6 @@ end process;
 
 
 micronClk <= ddr_out;
-
-
 
 
 ----------------------------
@@ -267,6 +271,7 @@ begin
 	data_counter_en <= '0';
 	adv_d0 <= '1';
 	adv_d1 <= '1';
+	req_done <= '0';
 	
 	case state_reg is
 	
@@ -333,6 +338,7 @@ begin
 			end if;
 		when done =>
 			state_next <= idle;
+			req_done <= '1';
 
 		when write_lat =>
 			lat_counter_en <= '1';
@@ -369,7 +375,6 @@ begin
 	-- defaults
 	OE_next <= '1';
 	WE_next <= '1';
---	ADV_next <= '1';
 	CE_next <= '1';
 	CRE_next <= '0';
 	tri_next <= '1';
@@ -383,11 +388,9 @@ begin
 		
 		when config_1 =>
 			CRE_next <= '1';
---			ADV_next <= '0';
 			CE_next <= '0';
 		when config_2 =>
 			CRE_next <= '1';
---			ADV_next <= '1';
 			CE_next <= '0';
 		when config_3 =>
 			CRE_next <= '1';
@@ -398,7 +401,6 @@ begin
 			CE_next <= '1';
 			WE_next <= '1';
 		when config_5 =>
---			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
 		when idle =>
@@ -414,15 +416,12 @@ begin
 			ddr_d0_next <= '1';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
---			ADV_next <= '0';
 			CE_next <= '0';
 			OE_next <= '0';
-			increment_en_next <= '1';
 		when done =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '0';
 			ddr_en_next <= '1';
---			ADV_next <= '0';
 			CE_next <= '0';
 		
 		when write_lat =>
@@ -432,11 +431,15 @@ begin
 			CE_next <= '0';
 			WE_next <= '0';
 			tri_next <= '0';
+			if lat_counter_reg = LAT_CODE - 1 then
+				increment_en_next <= '1';
+			else
+				increment_en_next <= '0';
+			end if;
 		when write_data =>
 			ddr_d0_next <= '0';
 			ddr_d1_next <= '1';
 			ddr_en_next <= '1';
---			ADV_next <= '0';
 			CE_next <= '0';
 			WE_next <= '0';
 			tri_next <= '0';
@@ -461,13 +464,12 @@ end process;
 micronAddr <= addr_reg;
 micronOE_n <= OE_reg;
 micronWE_n <= WE_reg;
---micronADV_n <= ADV_reg;
 micronCE_n <= CE_reg;
 micronCRE <= CRE_reg;
 
 ready <= ready_reg;
 req_data_read <= data_read_reg;
-increment_en <= increment_en_reg;
+write_increment_en <= increment_en_reg;
 
 
 end Behavioral;

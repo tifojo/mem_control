@@ -21,15 +21,14 @@ entity hardware_testbench is
 		micronUB_n : out  STD_LOGIC;
 		micronCRE : out  STD_LOGIC;
 		micronClk : out  STD_LOGIC;
+		micronWait : in STD_LOGIC;
 		
 		flashCS_n : out STD_LOGIC;
 		
 --		read_out : out STD_LOGIC_VECTOR (15 downto 0)
 
 		led_0 : out STD_LOGIC;
-		led_1 : out STD_LOGIC;
-		
-		micron_wait : in STD_LOGIC
+		led_1 : out STD_LOGIC
 	 
 	 
 	 );
@@ -40,12 +39,15 @@ architecture Behavioral of hardware_testbench is
 	signal test_ready : STD_LOGIC;
 	signal test_req_burst : STD_LOGIC := '0';
 	signal test_is_read : STD_LOGIC := '0';
+	signal test_read_valid : STD_LOGIC;
 	signal test_increment_en : STD_LOGIC;
 	
 	signal test_address : STD_LOGIC_VECTOR (22 downto 0) := (others => '0');
 
 	signal test_data_write : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
 	signal test_data_read : STD_LOGIC_VECTOR (15 downto 0);
+	
+	signal done : STD_LOGIC;
 	
 --	signal error : STD_LOGIC := '0';
 	
@@ -81,16 +83,19 @@ mem_control_inst : entity work.mem_control
 		micronUB_n => micronUB_n,
 		micronCRE => micronCRE,
 		micronClk => micronClk,
+		micronWait => micronWait,
 		
 		flashCS_n => flashCS_n,
 		
 		ready => test_ready,
 		req_burst_128 => test_req_burst,
 		req_read => test_is_read,
-		increment_en => test_increment_en,
+		read_data_valid => test_read_valid,
+		write_increment_en => test_increment_en,
 		req_addr => test_address,
 		req_data_write => test_data_write,
-		req_data_read => test_data_read
+		req_data_read => test_data_read,
+		req_done => done
 	);
 
 
@@ -115,7 +120,7 @@ begin
 				if test_increment_en = '1' then
 					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 				end if;
-				if test_data_write = x"007f" then
+				if done = '1' then
 					test_state <= idle;
 					test_is_read <= '1';
 				else
@@ -126,7 +131,7 @@ begin
 				if test_increment_en = '1' then
 					test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 				end if;
-				if test_data_write = x"007f" then
+				if done = '1' then
 					test_state <= idle;
 					test_is_read <= '0';
 					test_address <= std_logic_vector(unsigned(test_address) + 128);
@@ -142,9 +147,9 @@ end process;
 
 led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
 			'0';
-			
-led_1 <= micron_wait;
 
+
+led_1 <= test_read_valid;
 -- read_out <= test_data_read;
 
 

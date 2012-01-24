@@ -27,8 +27,7 @@ entity hardware_testbench is
 		
 --		read_out : out STD_LOGIC_VECTOR (15 downto 0)
 
-		led_0 : out STD_LOGIC;
-		led_1 : out STD_LOGIC
+		led : out STD_LOGIC_VECTOR (7 downto 0)
 	 
 	 
 	 );
@@ -49,7 +48,7 @@ architecture Behavioral of hardware_testbench is
 	
 	signal done : STD_LOGIC;
 	
---	signal error : STD_LOGIC := '0';
+	signal error : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
 	
 	type test_state_type is (idle, read_test, write_test, test_done);
 	signal test_state : test_state_type := idle;
@@ -142,6 +141,9 @@ begin
 					else
 						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 					end if;
+					if test_data_write /= test_data_read then
+						error <= std_logic_vector(unsigned(error) + 1);
+					end if;
 				end if;
 				if done = '1' then
 					if test_address(22 downto 8) = "111111111111111" then
@@ -159,11 +161,15 @@ begin
 end process;
 		
 
-led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
-			'0';
+led <= error;
 
 
-led_1 <= test_read_valid;
+
+--led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
+--			'0';
+--
+--
+--led_1 <= test_read_valid;
 -- read_out <= test_data_read;
 
 

@@ -43,11 +43,14 @@ architecture Behavioral of hardware_testbench is
 	signal test_address : STD_LOGIC_VECTOR (22 downto 0) := (others => '0');
 
 	signal test_data_write : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal data_write_out : STD_LOGIC_VECTOR (15 downto 0);
 	signal test_data_read : STD_LOGIC_VECTOR (15 downto 0);
 	
 	signal done : STD_LOGIC;
 	
-	signal error : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
+	signal test_inverted : STD_LOGIC := '0';
+	
+	signal error : STD_LOGIC_VECTOR (6 downto 0) := (others => '0');
 	
 	type test_state_type is (idle, read_test, write_test, test_done);
 	signal test_state : test_state_type := idle;
@@ -92,7 +95,7 @@ mem_control_inst : entity work.mem_control
 		read_data_valid => test_read_valid,
 		write_increment_en => test_increment_en,
 		req_addr => test_address,
-		req_data_write => test_data_write,
+		req_data_write => data_write_out,
 		req_data_read => test_data_read,
 		req_done => done
 	);
@@ -118,6 +121,7 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
+					test_inverted <= not test_inverted;
 					if test_data_write = x"FFFE" then
 						test_data_write <= (others => '0');
 					else
@@ -136,12 +140,13 @@ begin
 			when read_test =>
 				test_req_burst <= '0';
 				if test_read_valid = '1' then
+					test_inverted <= not test_inverted;
 					if test_data_write = x"FFFE" then
 						test_data_write <= (others => '0');
 					else
 						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 					end if;
-					if test_data_write /= test_data_read then
+					if data_write_out /= test_data_read then
 						error <= std_logic_vector(unsigned(error) + 1);
 					end if;
 				end if;
@@ -149,6 +154,7 @@ begin
 					if test_address(22 downto 7) = x"FFFF" then
 						test_state <= idle;
 						test_is_read <= '0';
+						test_inverted <= not test_inverted;
 					else
 						test_req_burst <= '1';
 						test_address <= std_logic_vector(unsigned(test_address) + 128);
@@ -160,30 +166,14 @@ begin
 		end if;
 end process;
 		
+data_write_out <= test_data_write when test_inverted = '0' else
+						not test_data_write;
+
 
 led(0) <= dcm_locked;
-led (7 downto 1) <= error (7 downto 1);
+led (7 downto 1) <= error;
 
 
---led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test
---			'0';
---
---
---led_1 <= test_read_valid;
--- read_out <= test_data_read;
-
-
---process(clk, ready)
---begin
---	if rising_edge(clk) then
---		if ready = '1' then
---			req_addr <= std_logic_vector(unsigned(req_addr) + 1);
---		end if;
---	end if;
---end process;
---
---req_burst_128 <= '1';
---req_read <= '0';
 
 end Behavioral;
 

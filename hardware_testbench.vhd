@@ -25,7 +25,6 @@ entity hardware_testbench is
 		
 		flashCS_n : out STD_LOGIC;
 		
---		read_out : out STD_LOGIC_VECTOR (15 downto 0)
 
 		led : out STD_LOGIC_VECTOR (7 downto 0)
 	 
@@ -53,18 +52,19 @@ architecture Behavioral of hardware_testbench is
 	type test_state_type is (idle, read_test, write_test, test_done);
 	signal test_state : test_state_type := idle;
 	
-	signal clk_25 : STD_LOGIC;
 	signal clk_50 : STD_LOGIC;
+	
+	signal dcm_locked : STD_LOGIC;
 
 begin
 
 clock_divider : entity work.clock_divider
 	port map(
 		CLKIN_IN => clk,
-		CLKDV_OUT => clk_25,
+		CLKDV_OUT => open,
 		CLKIN_IBUFG_OUT => open,
 		CLK0_OUT => clk_50,
-		LOCKED_OUT => open);
+		LOCKED_OUT => dcm_locked);
 		
 
 
@@ -125,7 +125,7 @@ begin
 					end if;
 				end if;
 				if done = '1' then
-					if test_address(22 downto 8) = "111111111111111" then
+					if test_address(22 downto 7) = x"FFFF" then
 						test_state <= idle;
 						test_is_read <= '1';
 					else
@@ -146,7 +146,7 @@ begin
 					end if;
 				end if;
 				if done = '1' then
-					if test_address(22 downto 8) = "111111111111111" then
+					if test_address(22 downto 7) = x"FFFF" then
 						test_state <= idle;
 						test_is_read <= '0';
 					else
@@ -161,8 +161,8 @@ begin
 end process;
 		
 
-led <= error;
-
+led(0) <= dcm_locked;
+led (7 downto 1) <= error (7 downto 1);
 
 
 --led_0 <= '1' when (test_data_read = test_data_write) else	-- not the correct test

@@ -49,6 +49,7 @@ architecture Behavioral of hardware_testbench is
 	signal done : STD_LOGIC;
 	
 	signal test_inverted : STD_LOGIC := '0';
+	signal test_init : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
 	
 	signal error : STD_LOGIC_VECTOR (6 downto 0) := (others => '0');
 	
@@ -107,7 +108,7 @@ begin
 	if rising_edge(clk_50) then
 		case test_state is
 			when idle =>
-				test_data_write <= (others => '0');
+				test_data_write <= test_init;
 				test_address <= (others => '0');
 				if test_is_read = '1' and test_ready = '1' then
 					test_state <= read_test;
@@ -121,7 +122,8 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
-					test_inverted <= not test_inverted;
+					-- uncomment for torture test
+--					test_inverted <= not test_inverted;
 					if test_data_write = x"FFFE" then
 						test_data_write <= (others => '0');
 					else
@@ -140,7 +142,8 @@ begin
 			when read_test =>
 				test_req_burst <= '0';
 				if test_read_valid = '1' then
-					test_inverted <= not test_inverted;
+					-- uncomment for torture test
+--					test_inverted <= not test_inverted;
 					if test_data_write = x"FFFE" then
 						test_data_write <= (others => '0');
 					else
@@ -155,6 +158,7 @@ begin
 						test_state <= idle;
 						test_is_read <= '0';
 						test_inverted <= not test_inverted;
+--						test_init <= std_logic_vector(unsigned(test_init) + 1);
 					else
 						test_req_burst <= '1';
 						test_address <= std_logic_vector(unsigned(test_address) + 128);

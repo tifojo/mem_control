@@ -61,8 +61,8 @@ architecture Behavioral of mem_control is
 
 	signal my_reset, my_reset_sync : STD_LOGIC := '1';  -- synchronized local reset for state machine
 
-	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, 1/2 drive, continuous burst)
-	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001011000"&"00"&"011"&"111";
+	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, full drive, continuous burst)
+	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001011000"&"00"&"001"&"111";
 	constant LAT_CODE : integer := 3;
 	
 	-- tristate control register for data bus

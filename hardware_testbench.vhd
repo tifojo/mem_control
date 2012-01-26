@@ -49,7 +49,8 @@ architecture Behavioral of hardware_testbench is
 	signal done : STD_LOGIC;
 	
 	signal test_inverted : STD_LOGIC := '0';
-	signal test_init : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal test_inverted_init : STD_LOGIC := '0';
+	signal test_init : STD_LOGIC_VECTOR (15 downto 0) := x"0001";
 	
 	signal error : STD_LOGIC_VECTOR (6 downto 0) := (others => '0');
 	
@@ -57,6 +58,10 @@ architecture Behavioral of hardware_testbench is
 	signal test_state : test_state_type := idle;
 	
 	signal clk_50 : STD_LOGIC;
+	signal clk_25 : STD_LOGIC;
+	signal clk_fx : STD_LOGIC;
+	
+	signal clk_int : STD_LOGIC;
 	
 	signal dcm_locked : STD_LOGIC;
 
@@ -65,16 +70,17 @@ begin
 clock_divider : entity work.clock_divider
 	port map(
 		CLKIN_IN => clk,
-		CLKDV_OUT => open,
+		CLKDV_OUT => clk_25,
+		CLKFX_OUT => clk_fx,
 		CLKIN_IBUFG_OUT => open,
 		CLK0_OUT => clk_50,
 		LOCKED_OUT => dcm_locked);
 		
-
+clk_int <= clk_fx;
 
 mem_control_inst : entity work.mem_control
 	port map(
-		clk => clk_50,
+		clk => clk_int,
 		
 		micronAddr => micronAddr,
 		micronData => micronData,
@@ -102,14 +108,15 @@ mem_control_inst : entity work.mem_control
 	);
 
 
-process(clk_50)
+process(clk_int)
 begin
 	
-	if rising_edge(clk_50) then
+	if rising_edge(clk_int) then
 		case test_state is
 			when idle =>
 				test_data_write <= test_init;
 				test_address <= (others => '0');
+				test_inverted <= test_inverted_init;
 				if test_is_read = '1' and test_ready = '1' then
 					test_state <= read_test;
 					test_req_burst <= '1';
@@ -122,13 +129,15 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
-					-- uncomment for torture test
+					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 --					test_inverted <= not test_inverted;
-					if test_data_write = x"FFFE" then
-						test_data_write <= (others => '0');
-					else
-						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-					end if;
+--					if test_inverted = '1' then
+--						if test_data_write = x"FFFE" then
+--							test_data_write <= (others => '0');
+--						else
+--							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);10
+--						end if;
+--					end if;
 				end if;
 				if done = '1' then
 					if test_address(22 downto 7) = x"FFFF" then
@@ -142,13 +151,15 @@ begin
 			when read_test =>
 				test_req_burst <= '0';
 				if test_read_valid = '1' then
-					-- uncomment for torture test
+					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 --					test_inverted <= not test_inverted;
-					if test_data_write = x"FFFE" then
-						test_data_write <= (others => '0');
-					else
-						test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-					end if;
+--					if test_inverted = '1' then
+--						if test_data_write = x"FFFE" then
+--							test_data_write <= (others => '0');
+--						else
+--							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+--						end if;
+--					end if;
 					if data_write_out /= test_data_read then
 						error <= std_logic_vector(unsigned(error) + 1);
 					end if;
@@ -157,8 +168,8 @@ begin
 					if test_address(22 downto 7) = x"FFFF" then
 						test_state <= idle;
 						test_is_read <= '0';
-						test_inverted <= not test_inverted;
---						test_init <= std_logic_vector(unsigned(test_init) + 1);
+						test_init <= std_logic_vector(unsigned(test_init) + 1);
+--						test_inverted_init <= not test_inverted_init;
 					else
 						test_req_burst <= '1';
 						test_address <= std_logic_vector(unsigned(test_address) + 128);

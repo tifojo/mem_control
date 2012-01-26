@@ -27,7 +27,8 @@ use UNISIM.Vcomponents.ALL;
 
 entity clock_divider is
    port ( CLKIN_IN        : in    std_logic; 
-          CLKDV_OUT       : out   std_logic; 
+          CLKDV_OUT       : out   std_logic;
+			 CLKFX_OUT		  : out   std_logic;
           CLKIN_IBUFG_OUT : out   std_logic; 
           CLK0_OUT        : out   std_logic; 
           LOCKED_OUT      : out   std_logic);
@@ -35,6 +36,7 @@ end clock_divider;
 
 architecture BEHAVIORAL of clock_divider is
    signal CLKDV_BUF       : std_logic;
+	signal CLKFX_BUF       : std_logic;
    signal CLKFB_IN        : std_logic;
    signal CLKIN_IBUFG     : std_logic;
    signal CLK0_BUF        : std_logic;
@@ -54,12 +56,16 @@ begin
    CLK0_BUFG_INST : BUFG
       port map (I=>CLK0_BUF,
                 O=>CLKFB_IN);
+					 
+	CLKFX_BUFG_INST : BUFG
+		port map (I=>CLKFX_BUF,
+		          O=>CLKFX_OUT);
    
    DCM_SP_INST : DCM_SP
    generic map( CLK_FEEDBACK => "1X",
             CLKDV_DIVIDE => 2.0,
-            CLKFX_DIVIDE => 1,
-            CLKFX_MULTIPLY => 4,
+            CLKFX_DIVIDE => 10,
+            CLKFX_MULTIPLY => 9,
             CLKIN_DIVIDE_BY_2 => FALSE,
             CLKIN_PERIOD => 20.000,
             CLKOUT_PHASE_SHIFT => "NONE",
@@ -78,7 +84,7 @@ begin
                 PSINCDEC=>GND_BIT,
                 RST=>GND_BIT,
                 CLKDV=>CLKDV_BUF,
-                CLKFX=>open,
+                CLKFX=>CLKFX_BUF,
                 CLKFX180=>open,
                 CLK0=>CLK0_BUF,
                 CLK2X=>open,

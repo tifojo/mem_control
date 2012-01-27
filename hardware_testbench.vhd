@@ -26,7 +26,9 @@ entity hardware_testbench is
 		flashCS_n : out STD_LOGIC;
 		
 
-		led : out STD_LOGIC_VECTOR (7 downto 0)
+		led : out STD_LOGIC_VECTOR (7 downto 0);
+		
+		bogus : out STD_LOGIC
 	 
 	 
 	 );
@@ -59,24 +61,51 @@ architecture Behavioral of hardware_testbench is
 	
 	signal clk_50 : STD_LOGIC;
 	signal clk_25 : STD_LOGIC;
-	signal clk_fx : STD_LOGIC;
+--	signal clk_fx : STD_LOGIC;
+
+	signal clk_0 : STD_LOGIC; -- 100 MHz
+	signal clk_90 : STD_LOGIC;
+	signal clk_180 : STD_LOGIC;
+	signal clk_270 : STD_LOGIC;
 	
 	signal clk_int : STD_LOGIC;
 	
 	signal dcm_locked : STD_LOGIC;
+	
+	signal debug_0 : STD_LOGIC_VECTOR (15 downto 0);
+	signal debug_90 : STD_LOGIC_VECTOR (15 downto 0);
+	signal debug_180 : STD_LOGIC_VECTOR (15 downto 0);
+	signal debug_270 : STD_LOGIC_VECTOR (15 downto 0);
+	signal debug_align : STD_LOGIC;
 
 begin
 
-clock_divider : entity work.clock_divider
+--clock_divider : entity work.clock_divider
+--	port map(
+--		CLKIN_IN => clk,
+--		CLKDV_OUT => clk_25,
+--		CLKFX_OUT => open,
+--		CLKIN_IBUFG_OUT => open,
+--		CLK0_OUT => clk_50,
+--		LOCKED_OUT => dcm_locked);
+
+cascade_dcm_inst : entity work.cascade_dcm
 	port map(
-		CLKIN_IN => clk,
-		CLKDV_OUT => clk_25,
-		CLKFX_OUT => clk_fx,
-		CLKIN_IBUFG_OUT => open,
-		CLK0_OUT => clk_50,
-		LOCKED_OUT => dcm_locked);
-		
-clk_int <= clk_fx;
+		U1_CLKIN_IN        => clk,
+		U1_RST_IN          => '0', 
+		U1_CLKIN_IBUFG_OUT => open, 
+		U1_CLK0_OUT        => clk_50,
+		U1_CLK2X_OUT       => open, 
+		U1_STATUS_OUT      => open,
+		U2_CLK0_OUT        => clk_0,
+		U2_CLK90_OUT       => clk_90, 
+		U2_CLK180_OUT      => clk_180, 
+		U2_CLK270_OUT      => clk_270, 
+		U2_LOCKED_OUT      => dcm_locked, 
+		U2_STATUS_OUT      => open
+	);
+
+clk_int <= clk_50;
 
 mem_control_inst : entity work.mem_control
 	port map(
@@ -104,7 +133,19 @@ mem_control_inst : entity work.mem_control
 		req_addr => test_address,
 		req_data_write => data_write_out,
 		req_data_read => test_data_read,
-		req_done => done
+		req_done => done,
+		
+		-- debug
+		clk_0 => clk_0,
+		clk_90 => clk_90,
+		clk_180 => clk_180,
+		clk_270 => clk_270,
+		
+		debug_0_out => debug_0,
+		debug_90_out => debug_90,
+		debug_180_out => debug_180,
+		debug_270_out => debug_270,
+		debug_align => debug_align
 	);
 
 
@@ -129,14 +170,14 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
-					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
---					test_inverted <= not test_inverted;
+--					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
+					test_inverted <= not test_inverted;
 --					if test_inverted = '1' then
---						if test_data_write = x"FFFE" then
---							test_data_write <= (others => '0');
---						else
---							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);10
---						end if;
+						if test_data_write = x"FFFE" then
+							test_data_write <= (others => '0');
+						else
+							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+						end if;
 --					end if;
 				end if;
 				if done = '1' then
@@ -151,14 +192,14 @@ begin
 			when read_test =>
 				test_req_burst <= '0';
 				if test_read_valid = '1' then
-					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
---					test_inverted <= not test_inverted;
+--					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
+					test_inverted <= not test_inverted;
 --					if test_inverted = '1' then
---						if test_data_write = x"FFFE" then
---							test_data_write <= (others => '0');
---						else
---							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
---						end if;
+						if test_data_write = x"FFFE" then
+							test_data_write <= (others => '0');
+						else
+							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+						end if;
 --					end if;
 					if data_write_out /= test_data_read then
 						error <= std_logic_vector(unsigned(error) + 1);
@@ -169,7 +210,7 @@ begin
 						test_state <= idle;
 						test_is_read <= '0';
 						test_init <= std_logic_vector(unsigned(test_init) + 1);
---						test_inverted_init <= not test_inverted_init;
+						test_inverted_init <= not test_inverted_init;
 					else
 						test_req_burst <= '1';
 						test_address <= std_logic_vector(unsigned(test_address) + 128);
@@ -187,6 +228,9 @@ data_write_out <= test_data_write when test_inverted = '0' else
 
 led(0) <= dcm_locked;
 led (7 downto 1) <= error;
+
+bogus <= '0' when (debug_0 and debug_90 and debug_180 and debug_270) = (debug_0'range => '0') and debug_align = '0' else
+			'1';
 
 
 

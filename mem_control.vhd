@@ -51,7 +51,23 @@ entity mem_control is
 				req_data_write : in STD_LOGIC_VECTOR (15 downto 0);
 				req_data_read : out STD_LOGIC_VECTOR (15 downto 0);
 				
-				req_done : out STD_LOGIC
+				req_done : out STD_LOGIC;
+				
+				----------------------
+				-- debug -------------
+				----------------------
+				
+				clk_0 : in STD_LOGIC;
+				clk_90 : in STD_LOGIC;
+				clk_180 : in STD_LOGIC;
+				clk_270 : in STD_LOGIC;
+				
+				debug_0_out : out STD_LOGIC_VECTOR (15 downto 0);
+				debug_90_out : out STD_LOGIC_VECTOR (15 downto 0);
+				debug_180_out : out STD_LOGIC_VECTOR (15 downto 0);
+				debug_270_out : out STD_LOGIC_VECTOR (15 downto 0);
+				
+				debug_align : out STD_LOGIC
 				
 				);
 				
@@ -62,7 +78,7 @@ architecture Behavioral of mem_control is
 	signal my_reset, my_reset_sync : STD_LOGIC := '1';  -- synchronized local reset for state machine
 
 	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, full drive, continuous burst)
-	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001011000"&"00"&"001"&"111";
+	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001"&"011"&"000"&"00"&"001"&"111";
 	constant LAT_CODE : integer := 3;
 	
 	-- tristate control register for data bus
@@ -114,6 +130,30 @@ architecture Behavioral of mem_control is
 	signal ddr_en_reg : STD_LOGIC := '0'; -- D0:D1:EN = "001" for 1 cycle to idle outputs low
 	signal ddr_d0_next, ddr_d1_next, ddr_en_next : STD_LOGIC;
 	signal ddr_out : STD_LOGIC;
+	
+	------------------
+	-- debug ---------
+	------------------
+	
+	signal debug_0_sync : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_0_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_0_reg1 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_0_reg2 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_90_sync : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_90_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_90_reg1 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_90_reg2 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_180_sync : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_180_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_180_reg1 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_180_reg2 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_270_sync : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_270_reg : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_270_reg1 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	signal debug_270_reg2 : STD_LOGIC_VECTOR (15 downto 0) := (others => '0');
+	
+	signal debug_align_sync : STD_LOGIC := '0';
+	signal debug_toggle : STD_LOGIC := '0';
 
 
 begin
@@ -141,6 +181,67 @@ begin
 		end if;
 	end if;
 end process;
+
+-----------
+-- debug --
+-----------
+
+process(clk_0)
+begin
+	if rising_edge(clk_0) then
+		debug_0_sync <= micronData;
+		debug_0_reg <= debug_0_sync;
+		debug_0_reg1 <= debug_0_reg;
+		debug_0_reg2 <= debug_0_reg1;
+		debug_90_reg1 <= debug_90_reg;
+		debug_90_reg2 <= debug_90_reg1;
+		debug_180_reg1 <= debug_180_reg;
+		debug_180_reg2 <= debug_180_reg1;
+		debug_270_reg2 <= debug_270_reg1;
+		
+		debug_align_sync <= debug_toggle;
+		debug_align <= debug_align_sync;
+	end if;
+end process;
+
+process(clk_90)
+begin
+	if rising_edge(clk_90) then
+		debug_90_sync <= micronData;
+		debug_90_reg <= debug_90_sync;
+	end if;
+end process;
+
+process(clk_180)
+begin
+	if rising_edge(clk_180) then
+		debug_180_sync <= micronData;
+		debug_180_reg <= debug_180_sync;
+		debug_270_reg1 <= debug_270_reg;
+	end if;
+end process;
+
+process(clk_270)
+begin
+	if rising_edge(clk_270) then
+		debug_270_sync <= micronData;
+		debug_270_reg <= debug_270_sync;
+	end if;
+end process;
+
+debug_0_out <= debug_0_reg2;
+debug_90_out <= debug_90_reg2;
+debug_180_out <= debug_180_reg2;
+debug_270_out <= debug_270_reg2;
+
+process(clk)
+begin
+	if rising_edge(clk) then
+		debug_toggle <= not debug_toggle;
+	end if;
+end process;
+
+-- end debug
 
 process(clk, data_write_en)
 begin

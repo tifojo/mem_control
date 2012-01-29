@@ -31,6 +31,9 @@ entity clock_divider is
 			 CLKFX_OUT		  : out   std_logic;
           CLKIN_IBUFG_OUT : out   std_logic; 
           CLK0_OUT        : out   std_logic; 
+			 CLK90_OUT		  : out   std_logic;
+			 CLK180_OUT      : out   std_logic;
+			 CLK270_OUT      : out   std_logic;
           LOCKED_OUT      : out   std_logic);
 end clock_divider;
 
@@ -89,9 +92,9 @@ begin
                 CLK0=>CLK0_BUF,
                 CLK2X=>open,
                 CLK2X180=>open,
-                CLK90=>open,
-                CLK180=>open,
-                CLK270=>open,
+                CLK90=>CLK90_OUT,
+                CLK180=>CLK180_OUT,
+                CLK270=>CLK270_OUT,
                 LOCKED=>LOCKED_OUT,
                 PSDONE=>open,
                 STATUS=>open);

@@ -26,9 +26,9 @@ entity hardware_testbench is
 		flashCS_n : out STD_LOGIC;
 		
 
-		led : out STD_LOGIC_VECTOR (7 downto 0);
+		led : out STD_LOGIC_VECTOR (7 downto 0)
 		
-		bogus : out STD_LOGIC
+--		bogus : out STD_LOGIC
 	 
 	 
 	 );
@@ -63,7 +63,7 @@ architecture Behavioral of hardware_testbench is
 	signal clk_25 : STD_LOGIC;
 --	signal clk_fx : STD_LOGIC;
 
-	signal clk_0 : STD_LOGIC; -- 100 MHz
+	signal clk_0 : STD_LOGIC;
 	signal clk_90 : STD_LOGIC;
 	signal clk_180 : STD_LOGIC;
 	signal clk_270 : STD_LOGIC;
@@ -77,35 +77,46 @@ architecture Behavioral of hardware_testbench is
 	signal debug_180 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_270 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_align : STD_LOGIC;
+	signal debug_0_delay : STD_LOGIC;
+--	signal debug_90_delay : STD_LOGIC;
+--	signal debug_180_delay : STD_LOGIC;
+--	signal debug_270_delay : STD_LOGIC;
+
+	constant DEBUG_INDEX : natural := 0;
+	
+	signal data_valid_delay : STD_LOGIC_VECTOR (2 downto 0) := "000";
 
 begin
 
---clock_divider : entity work.clock_divider
---	port map(
---		CLKIN_IN => clk,
---		CLKDV_OUT => clk_25,
---		CLKFX_OUT => open,
---		CLKIN_IBUFG_OUT => open,
---		CLK0_OUT => clk_50,
---		LOCKED_OUT => dcm_locked);
-
-cascade_dcm_inst : entity work.cascade_dcm
+clock_divider : entity work.clock_divider
 	port map(
-		U1_CLKIN_IN        => clk,
-		U1_RST_IN          => '0', 
-		U1_CLKIN_IBUFG_OUT => open, 
-		U1_CLK0_OUT        => clk_50,
-		U1_CLK2X_OUT       => open, 
-		U1_STATUS_OUT      => open,
-		U2_CLK0_OUT        => clk_0,
-		U2_CLK90_OUT       => clk_90, 
-		U2_CLK180_OUT      => clk_180, 
-		U2_CLK270_OUT      => clk_270, 
-		U2_LOCKED_OUT      => dcm_locked, 
-		U2_STATUS_OUT      => open
-	);
+		CLKIN_IN => clk,
+		CLKDV_OUT => clk_25,
+		CLKFX_OUT => open,
+		CLKIN_IBUFG_OUT => open,
+		CLK0_OUT => clk_0,
+		CLK90_OUT => clk_90,
+		CLK180_OUT => clk_180,
+		CLK270_OUT => clk_270,
+		LOCKED_OUT => dcm_locked);
 
-clk_int <= clk_50;
+--cascade_dcm_inst : entity work.cascade_dcm
+--	port map(
+--		U1_CLKIN_IN        => clk,
+--		U1_RST_IN          => '0', 
+--		U1_CLKIN_IBUFG_OUT => open, 
+--		U1_CLK0_OUT        => clk_50,
+--		U1_CLK2X_OUT       => open, 
+--		U1_STATUS_OUT      => open,
+--		U2_CLK0_OUT        => clk_0,
+--		U2_CLK90_OUT       => clk_90, 
+--		U2_CLK180_OUT      => clk_180, 
+--		U2_CLK270_OUT      => clk_270, 
+--		U2_LOCKED_OUT      => dcm_locked, 
+--		U2_STATUS_OUT      => open
+--	);
+
+clk_int <= clk_0;
 
 mem_control_inst : entity work.mem_control
 	port map(
@@ -172,13 +183,13 @@ begin
 				if test_increment_en = '1' then
 --					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 					test_inverted <= not test_inverted;
---					if test_inverted = '1' then
+					if test_inverted = '1' then
 						if test_data_write = x"FFFE" then
 							test_data_write <= (others => '0');
 						else
 							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 						end if;
---					end if;
+					end if;
 				end if;
 				if done = '1' then
 					if test_address(22 downto 7) = x"FFFF" then
@@ -194,13 +205,13 @@ begin
 				if test_read_valid = '1' then
 --					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 					test_inverted <= not test_inverted;
---					if test_inverted = '1' then
+					if test_inverted = '1' then
 						if test_data_write = x"FFFE" then
 							test_data_write <= (others => '0');
 						else
 							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
 						end if;
---					end if;
+					end if;
 					if data_write_out /= test_data_read then
 						error <= std_logic_vector(unsigned(error) + 1);
 					end if;
@@ -222,16 +233,33 @@ begin
 		end if;
 end process;
 		
-data_write_out <= test_data_write when test_inverted = '0' else
-						not test_data_write;
+data_write_out <= x"0001" when test_inverted = '0' else
+						x"0000";
 
 
 led(0) <= dcm_locked;
-led (7 downto 1) <= error;
+led(1) <= error(6);
 
-bogus <= '0' when (debug_0 and debug_90 and debug_180 and debug_270) = (debug_0'range => '0') and debug_align = '0' else
-			'1';
+led(3 downto 2) <= "00";
 
+--bogus <= '0' when (debug_0 and debug_90 and debug_180 and debug_270) = (debug_0'range => '0') and debug_align = '0' else
+--			'1';
+
+process(clk_int)
+begin
+	if rising_edge(clk_int) then
+		debug_0_delay <= debug_0(DEBUG_INDEX);
+		data_valid_delay <= data_valid_delay (1 downto 0) & test_read_valid;
+--		debug_90_delay <= debug_90(15);
+--		debug_180_delay <= debug_180(15);
+--		debug_270_delay <= debug_270(15);
+	end if;
+end process;
+
+led(7) <= data_valid_delay(2) and (debug_0(DEBUG_INDEX) xor debug_90(DEBUG_INDEX));
+led(6) <= data_valid_delay(2) and (debug_90(DEBUG_INDEX) xor debug_180(DEBUG_INDEX));
+led(5) <= data_valid_delay(2) and (debug_180(DEBUG_INDEX) xor debug_270(DEBUG_INDEX));
+led(4) <= data_valid_delay(2) and (debug_270(DEBUG_INDEX) xor debug_0_delay);
 
 
 end Behavioral;

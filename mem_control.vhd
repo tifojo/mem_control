@@ -76,6 +76,9 @@ end mem_control;
 architecture Behavioral of mem_control is
 
 	signal my_reset, my_reset_sync : STD_LOGIC := '1';  -- synchronized local reset for state machine
+	attribute shreg_extract : string;
+	attribute shreg_extract of my_reset_sync : signal is "NO";
+
 
 	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, full drive, continuous burst)
 	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001"&"011"&"000"&"00"&"001"&"111";
@@ -85,7 +88,11 @@ architecture Behavioral of mem_control is
 	signal tri_reg : STD_LOGIC := '1';
 	signal tri_next : STD_LOGIC;
 	
+	attribute iob : string;
+	attribute iob of tri_reg : signal is "TRUE";
+	
 	-- registers for all external signals
+	
 	signal OE_reg, WE_reg, CE_reg : STD_LOGIC := '1';
 	signal OE_next, WE_next, CE_next : STD_LOGIC;
 	signal CRE_reg : STD_LOGIC := '0'; -- config register enable
@@ -155,6 +162,24 @@ architecture Behavioral of mem_control is
 	signal debug_align_sync : STD_LOGIC := '0';
 	signal debug_toggle : STD_LOGIC := '0';
 
+	attribute maxdelay : string;
+	attribute maxdelay of debug_0_sync : signal is "1.5 ns";
+	attribute maxdelay of debug_90_sync : signal is "1.5 ns";
+	attribute maxdelay of debug_180_sync : signal is "1.5 ns";
+	attribute maxdelay of debug_270_sync : signal is "1.5 ns";
+	attribute maxdelay of debug_align_sync : signal is "1.5 ns";
+	
+	signal data_read_int : STD_LOGIC_VECTOR (15 downto 0);
+	
+	attribute maxskew : string;
+	attribute maxskew of data_read_int : signal is "500 ps";
+	attribute maxdelay of data_read_int : signal is "1 ns";
+	
+	attribute iob of debug_0_sync : signal is "FALSE";
+	attribute iob of debug_90_sync : signal is "FALSE";
+	attribute iob of debug_180_sync : signal is "FALSE";
+	attribute iob of debug_270_sync : signal is "FALSE";
+
 
 begin
 
@@ -171,77 +196,26 @@ flashCS_n <= '1';
 -- Bidirectional data bus to RAM ------------------------------------------------
 ---------------------------------------------------------------------------------
 
-micronData <= data_write_reg when tri_reg = '0' else (others => 'Z');
+--micronData <= data_write_reg when tri_reg = '0' else (others => 'Z');
+
+data_iobuf_array :
+for k in 15 downto 0 generate
+	data_iobuf : IOBUF
+	port map (
+		O => data_read_int(k),
+		IO => micronData(k),
+		I => data_write_reg(k),
+		T => tri_reg );
+end generate data_iobuf_array;
 
 process(clk, data_read_en)
 begin
 	if rising_edge(clk) then
 		if data_read_en = '1' then
-			data_read_reg <= micronData;
+			data_read_reg <= data_read_int;
 		end if;
 	end if;
 end process;
-
------------
--- debug --
------------
-
-process(clk_0)
-begin
-	if rising_edge(clk_0) then
-		debug_0_sync <= micronData;
-		debug_0_reg <= debug_0_sync;
-		debug_0_reg1 <= debug_0_reg;
-		debug_0_reg2 <= debug_0_reg1;
-		debug_90_reg1 <= debug_90_reg;
-		debug_90_reg2 <= debug_90_reg1;
-		debug_180_reg1 <= debug_180_reg;
-		debug_180_reg2 <= debug_180_reg1;
-		debug_270_reg2 <= debug_270_reg1;
-		
-		debug_align_sync <= debug_toggle;
-		debug_align <= debug_align_sync;
-	end if;
-end process;
-
-process(clk_90)
-begin
-	if rising_edge(clk_90) then
-		debug_90_sync <= micronData;
-		debug_90_reg <= debug_90_sync;
-	end if;
-end process;
-
-process(clk_180)
-begin
-	if rising_edge(clk_180) then
-		debug_180_sync <= micronData;
-		debug_180_reg <= debug_180_sync;
-		debug_270_reg1 <= debug_270_reg;
-	end if;
-end process;
-
-process(clk_270)
-begin
-	if rising_edge(clk_270) then
-		debug_270_sync <= micronData;
-		debug_270_reg <= debug_270_sync;
-	end if;
-end process;
-
-debug_0_out <= debug_0_reg2;
-debug_90_out <= debug_90_reg2;
-debug_180_out <= debug_180_reg2;
-debug_270_out <= debug_270_reg2;
-
-process(clk)
-begin
-	if rising_edge(clk) then
-		debug_toggle <= not debug_toggle;
-	end if;
-end process;
-
--- end debug
 
 process(clk, data_write_en)
 begin
@@ -259,6 +233,66 @@ begin
 	end if;
 end process;
 
+-----------
+-- debug --
+-----------
+
+process(clk_0)
+begin
+	if rising_edge(clk_0) then
+		debug_0_sync <= data_read_int;
+		debug_0_reg <= debug_0_sync;
+		debug_0_reg1 <= debug_0_reg;
+		debug_0_reg2 <= debug_0_reg1;
+		debug_90_reg1 <= debug_90_reg;
+		debug_90_reg2 <= debug_90_reg1;
+		debug_180_reg1 <= debug_180_reg;
+		debug_180_reg2 <= debug_180_reg1;
+		debug_270_reg2 <= debug_270_reg1;
+		
+--		debug_align_sync <= debug_toggle;
+--		debug_align <= debug_align_sync;
+	end if;
+end process;
+
+process(clk_90)
+begin
+	if rising_edge(clk_90) then
+		debug_90_sync <= data_read_int;
+		debug_90_reg <= debug_90_sync;
+	end if;
+end process;
+
+process(clk_180)
+begin
+	if rising_edge(clk_180) then
+		debug_180_sync <= data_read_int;
+		debug_180_reg <= debug_180_sync;
+		debug_270_reg1 <= debug_270_reg;
+	end if;
+end process;
+
+process(clk_270)
+begin
+	if rising_edge(clk_270) then
+		debug_270_sync <= data_read_int;
+		debug_270_reg <= debug_270_sync;
+	end if;
+end process;
+
+debug_0_out <= debug_0_reg2;
+debug_90_out <= debug_90_reg2;
+debug_180_out <= debug_180_reg2;
+debug_270_out <= debug_270_reg2;
+
+--process(clk)
+--begin
+--	if rising_edge(clk) then
+--		debug_toggle <= not debug_toggle;
+--	end if;
+--end process;
+
+debug_align <= '0';
 
 ---------------------------------------------------------------------------------
 -- Address bus ------------------------------------------------------------------

@@ -3,7 +3,7 @@ NET "clk" LOC= "B8"; # Bank = 0 , Pin name = IP_L13P_0/GCLK8 , Type = GCLK , Sch
 NET "clk" TNM_NET = "clk_net";
 TIMESPEC "TS_clk_net" = PERIOD "clk_net" 20 ns HIGH 50%;
 
-NET "bogus" LOC= "B16";
+#NET "bogus" LOC= "B16";
 
 NET "micronAddr<0>" LOC= "J1" | IOSTANDARD = LVCMOS33 | SLEW = FAST; # Bank = 3 , Pin name = IO_L12P_3/LHCLK2 , Type = LHCLK , Sch name = ADR1
 NET "micronAddr<1>" LOC= "J2" | IOSTANDARD = LVCMOS33 | SLEW = FAST; # Bank = 3 , Pin name = IO_L12N_3/LHCLK3/IRDY2 , Type = LHCLK , Sch name = ADR2

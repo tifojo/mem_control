@@ -81,8 +81,9 @@ architecture Behavioral of mem_control is
 
 
 	-- configuration opcode for PSRAM bus (select BCR, burst mode, 4 clk latency, full drive, continuous burst)
-	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001"&"011"&"000"&"00"&"001"&"111";
+	constant CONFIG_WORD : STD_LOGIC_VECTOR (22 downto 0) := "000100001"&"011"&"000"&"00"&"001"&"100";
 	constant LAT_CODE : integer := 3;
+	constant BURST_LENGTH : integer := 32;
 	
 	-- tristate control register for data bus
 	signal tri_reg : STD_LOGIC := '1';
@@ -127,7 +128,7 @@ architecture Behavioral of mem_control is
 	signal lat_counter_rst, lat_counter_en: STD_LOGIC;
 	
 	-- counter for managing burst length
-	signal data_counter_reg : UNSIGNED (7 downto 0) := (others => '0');
+	signal data_counter_reg : INTEGER range 0 to BURST_LENGTH := 0;
 	signal data_counter_rst, data_counter_en : STD_LOGIC;
 
 	-- micronClk is generated from a DDR output register (ODDR2 primitive)
@@ -175,10 +176,16 @@ architecture Behavioral of mem_control is
 	attribute maxskew of data_read_int : signal is "500 ps";
 	attribute maxdelay of data_read_int : signal is "1 ns";
 	
-	attribute iob of debug_0_sync : signal is "FALSE";
+	attribute iob of debug_0_sync : signal is "FALSE";  -- prevent XST from packing signals into DDR registers
 	attribute iob of debug_90_sync : signal is "FALSE";
 	attribute iob of debug_180_sync : signal is "FALSE";
 	attribute iob of debug_270_sync : signal is "FALSE";
+	
+	attribute keep : string;
+	attribute keep of debug_0_reg2 : signal is "TRUE";  -- preserve registers to be probed by chipscope
+	attribute keep of debug_90_reg2 : signal is "TRUE";
+	attribute keep of debug_180_reg2 : signal is "TRUE";
+	attribute keep of debug_270_reg2 : signal is "TRUE";
 
 
 begin
@@ -416,7 +423,7 @@ process(clk, data_counter_rst, data_counter_en)
 begin
 	if rising_edge(clk) then
 		if data_counter_rst = '1' then
-			data_counter_reg <= (others => '0');
+			data_counter_reg <= 0;
 		elsif data_counter_en = '1' then
 			data_counter_reg <= data_counter_reg + 1;
 		end if;
@@ -501,7 +508,7 @@ begin
 			data_read_en <= '1';
 			data_counter_en <= '1';
 			read_data_valid_next <= micronWait;
-			if data_counter_reg(7) = '1' then
+			if data_counter_reg = BURST_LENGTH then
 				state_next <= done;
 			else
 				state_next <= read_data;
@@ -525,7 +532,7 @@ begin
 		when write_data =>
 			data_counter_en <= '1';
 			data_write_en <= '1'; -- latch req_write_data onto external data bus
-			if data_counter_reg(7) = '1' then
+			if data_counter_reg = BURST_LENGTH then
 				state_next <= done;
 			else
 				state_next <= write_data;
@@ -613,7 +620,7 @@ begin
 			CE_next <= '0';
 			WE_next <= '0';
 			tri_next <= '0';
-			if data_counter_reg = "01111111" then
+			if data_counter_reg = BURST_LENGTH - 1 then
 				increment_en_next <= '0';
 			else
 				increment_en_next <= '1';

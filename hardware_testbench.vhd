@@ -36,6 +36,8 @@ end hardware_testbench;
 
 architecture Behavioral of hardware_testbench is
 
+	constant BURST_LENGTH : unsigned (22 downto 0) := to_unsigned(32,23);
+
 	signal test_ready : STD_LOGIC;
 	signal test_req_burst : STD_LOGIC := '0';
 	signal test_is_read : STD_LOGIC := '0';
@@ -72,17 +74,21 @@ architecture Behavioral of hardware_testbench is
 	
 	signal dcm_locked : STD_LOGIC;
 	
+	-----------
+	-- debug --
+	-----------
+	
 	signal debug_0 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_90 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_180 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_270 : STD_LOGIC_VECTOR (15 downto 0);
 	signal debug_align : STD_LOGIC;
-	signal debug_0_delay : STD_LOGIC;
+--	signal debug_0_delay : STD_LOGIC;
 --	signal debug_90_delay : STD_LOGIC;
 --	signal debug_180_delay : STD_LOGIC;
---	signal debug_270_delay : STD_LOGIC;
+	signal debug_270_delay : STD_LOGIC;
 
-	constant DEBUG_INDEX : natural := 0;
+	constant DEBUG_INDEX : natural := 15;
 	
 	signal data_valid_delay : STD_LOGIC_VECTOR (2 downto 0) := "000";
 
@@ -181,15 +187,15 @@ begin
 			when write_test =>
 				test_req_burst <= '0';
 				if test_increment_en = '1' then
---					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
+					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 					test_inverted <= not test_inverted;
-					if test_inverted = '1' then
-						if test_data_write = x"FFFE" then
-							test_data_write <= (others => '0');
-						else
-							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-						end if;
-					end if;
+--					if test_inverted = '1' then
+--						if test_data_write = x"FFFE" then
+--							test_data_write <= (others => '0');
+--						else
+--							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+--						end if;
+--					end if;
 				end if;
 				if done = '1' then
 					if test_address(22 downto 7) = x"FFFF" then
@@ -197,21 +203,21 @@ begin
 						test_is_read <= '1';
 					else
 						test_req_burst <= '1';
-						test_address <= std_logic_vector(unsigned(test_address) + 128);
+						test_address <= std_logic_vector(unsigned(test_address) + BURST_LENGTH);
 					end if;
 				end if;
 			when read_test =>
 				test_req_burst <= '0';
 				if test_read_valid = '1' then
---					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
+					test_data_write <= (test_data_write(14 downto 0))&(test_data_write(15) xor test_data_write(13) xor test_data_write(12) xor test_data_write(10));
 					test_inverted <= not test_inverted;
-					if test_inverted = '1' then
-						if test_data_write = x"FFFE" then
-							test_data_write <= (others => '0');
-						else
-							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
-						end if;
-					end if;
+--					if test_inverted = '1' then
+--						if test_data_write = x"FFFE" then
+--							test_data_write <= (others => '0');
+--						else
+--							test_data_write <= std_logic_vector(unsigned(test_data_write) + 1);
+--						end if;
+--					end if;
 					if data_write_out /= test_data_read then
 						error <= std_logic_vector(unsigned(error) + 1);
 					end if;
@@ -224,7 +230,7 @@ begin
 						test_inverted_init <= not test_inverted_init;
 					else
 						test_req_burst <= '1';
-						test_address <= std_logic_vector(unsigned(test_address) + 128);
+						test_address <= std_logic_vector(unsigned(test_address) + BURST_LENGTH);
 					end if;
 				end if;
 			when others =>
@@ -233,8 +239,8 @@ begin
 		end if;
 end process;
 		
-data_write_out <= x"0001" when test_inverted = '0' else
-						x"0000";
+data_write_out <= test_data_write;-- when test_inverted = '0' else
+--						not test_data_write;
 
 
 led(0) <= dcm_locked;
@@ -248,7 +254,7 @@ led(3 downto 2) <= "00";
 process(clk_int)
 begin
 	if rising_edge(clk_int) then
-		debug_0_delay <= debug_0(DEBUG_INDEX);
+		debug_270_delay <= debug_270(DEBUG_INDEX);
 		data_valid_delay <= data_valid_delay (1 downto 0) & test_read_valid;
 --		debug_90_delay <= debug_90(15);
 --		debug_180_delay <= debug_180(15);
@@ -259,7 +265,7 @@ end process;
 led(7) <= data_valid_delay(2) and (debug_0(DEBUG_INDEX) xor debug_90(DEBUG_INDEX));
 led(6) <= data_valid_delay(2) and (debug_90(DEBUG_INDEX) xor debug_180(DEBUG_INDEX));
 led(5) <= data_valid_delay(2) and (debug_180(DEBUG_INDEX) xor debug_270(DEBUG_INDEX));
-led(4) <= data_valid_delay(2) and (debug_270(DEBUG_INDEX) xor debug_0_delay);
+led(4) <= data_valid_delay(2) and (debug_270_delay xor debug_0(DEBUG_INDEX));
 
 
 end Behavioral;
